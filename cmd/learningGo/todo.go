@@ -2,10 +2,29 @@ package main
 
 import (
 	// "fmt"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"log"
 	"strings"
+)
 
-	tea "github.com/charmbracelet/bubbletea"
+var (
+	titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("205"))
+
+	selectedStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("229"))
+
+	doneStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42"))
+
+	inputStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("212"))
+
+	helpStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241"))
 )
 
 type todo struct {
@@ -14,24 +33,27 @@ type todo struct {
 }
 
 type model struct {
-	todos   []todo
-	cursor  int
-	message string
+	todos        []todo
+	cursor       int
+	message      string
 	selectedItem string
+
+	adding bool
+	input  string
 }
 
 func initialModel() model {
 	items := []todo{
-		{"Open Huh form", false},
-		{"Run Gum confirm", false},
-		{"Native Bubble Tea confirm", false},
-		{"Quit", false},
+		// {"Open Huh form", false},
+		// {"Run Gum confirm", false},
+		// {"Native Bubble Tea confirm", false},
+		// {"Quit", false},
 	}
 
 	return model{
-		todos:   items,
-		cursor:  0,
-		message: "To do list",
+		todos:        items,
+		cursor:       0,
+		message:      "To do list",
 		selectedItem: "",
 	}
 	// return model{}
@@ -45,11 +67,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.adding {
+			switch msg.String() {
+			case "esc":
+				m.adding = false
+				m.input = ""
+
+			case "enter":
+				if m.input != "" {
+					m.todos = append(m.todos, todo{text: m.input})
+					m.cursor = len(m.todos) - 1
+				}
+				m.adding = false
+				m.input = ""
+
+			case "backspace":
+				if len(m.input) > 0 {
+					m.input = m.input[:len(m.input)-1]
+				}
+
+			default:
+				// add typed characters
+				if len(msg.Runes) > 0 {
+					m.input += string(msg.Runes)
+				}
+			}
+
+			return m, nil
+		}
+
 		switch msg.String() {
-		case "ctrl+c":
+		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "q":
-			return m, tea.Quit
+		case "a":
+			m.adding = true
+			m.input = ""
 		case "up":
 			if len(m.todos) > 0 {
 				if m.cursor > 0 {
@@ -77,8 +129,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cursor = 0
 					m.selectedItem = ""
 				} else {
-					if m.selectedItem != ""{	
-					m.selectedItem = "Selected: " + m.todos[m.cursor].text
+					if m.selectedItem != "" {
+						m.selectedItem = "Selected: " + m.todos[m.cursor].text
 					}
 				}
 			}
@@ -89,13 +141,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	}
+
 	return m, cmd
 }
 
 func (m model) View() string {
+	if m.adding {
+		var s string
+		s += titleStyle.Render("Add new todo") + "\n"
+		s += "──────────────\n"
+		s += inputStyle.Render("> "+m.input+"█") + "\n\n"
+		s += helpStyle.Render("(enter to save • esc to cancel)")
+		return s
+	}
 	var s string
 	//title
-	s += m.message + "\n\n"
+	s += titleStyle.Render(m.message) + "\n\n"
 	//render todos
 	for i, t := range m.todos {
 		cursor := " "
@@ -111,10 +172,18 @@ func (m model) View() string {
 			text = strings.ToUpper(text)
 		}
 		line := cursor + " " + checbox + " " + text
+		if t.done {
+			line = doneStyle.Render(line)
+		}
+		if m.cursor == i {
+			line = selectedStyle.Render(line)
+		}
 		s += line + "\n"
 	}
-	s +=  m.selectedItem
-	s += "\n↑/↓ move • space toggle • d delete • q quit"
+	s += m.selectedItem
+	s += "\n" + helpStyle.Render(
+			"↑/↓ move • space toggle • d delete • q quit • a add",
+	)
 	return s
 }
 
