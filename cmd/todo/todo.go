@@ -5,8 +5,30 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"log"
-	"strings"
+	//"strings"
 )
+
+var (
+	appStyle = lipgloss.NewStyle().Padding(1,2)
+
+	listPaneStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1,2).
+		Width(40)
+	detailPaneStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		Padding(1, 2).
+		Width(30)
+
+	addPaneStyle = lipgloss.NewStyle().
+		Border(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color("212")).
+		Padding(1, 2).
+		Width(50)
+)
+
 
 var (
 	titleStyle = lipgloss.NewStyle().
@@ -27,6 +49,48 @@ var (
 			Foreground(lipgloss.Color("241"))
 )
 
+func (m model) renderListPane() string {
+	var s string
+
+	s+= titleStyle.Render("Todos") + "\n\n"
+	for i, t := range m.todos {
+		cursor := " "
+		if m.cursor == i {
+			cursor = ">"
+		}
+
+		checkbox := "[ ]"
+		if t.done {
+			checkbox = "[x]"
+		}
+
+		line := cursor + " " + checkbox + " " + t.text
+
+		if t.done {
+			line = doneStyle.Render(line)
+		}
+		if m.cursor == i {
+			line = selectedStyle.Render(line)
+		}
+
+		s += line + "\n"
+	}
+
+	return listPaneStyle.Render(s)
+}
+func (m model) renderDetailPane() string {
+	var s string
+
+	s += titleStyle.Render("Details") + "\n\n"
+
+	if m.selectedItem == "" {
+		s += helpStyle.Render("No item selected")
+	} else {
+		s += m.selectedItem
+	}
+
+	return detailPaneStyle.Render(s)
+}
 type todo struct {
 	text string
 	done bool
@@ -146,45 +210,73 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	// if m.adding {
+	// 	// var s string
+	// 	// s += titleStyle.Render("Add new todo") + "\n"
+	// 	// s += "──────────────\n"
+	// 	// s += inputStyle.Render("> "+m.input+"█") + "\n\n"
+	// 	// s += helpStyle.Render("(enter to save • esc to cancel)")
+	// 	// return s
+	// 	return appStyle.Render("Add New Todo") + "\n\n" +
+	// 	inputStyle.Render("> "+m.input+"█") + "\n\n"
+	// 	helpStyle.Render("(enter to save • esc to cancel)")
+	//
+	// }
+	// var s string
+	// //title
+	// s += titleStyle.Render(m.message) + "\n\n"
+	// //render todos
+	// for i, t := range m.todos {
+	// 	cursor := " "
+	// 	if m.cursor == i {
+	// 		cursor = ">"
+	// 	}
+	// 	checbox := "[ ]"
+	// 	if t.done {
+	// 		checbox = "[x]"
+	// 	}
+	// 	text := t.text
+	// 	if m.cursor == i {
+	// 		text = strings.ToUpper(text)
+	// 	}
+	// 	line := cursor + " " + checbox + " " + text
+	// 	if t.done {
+	// 		line = doneStyle.Render(line)
+	// 	}
+	// 	if m.cursor == i {
+	// 		line = selectedStyle.Render(line)
+	// 	}
+	// 	s += line + "\n"
+	// }
+	// s += m.selectedItem
+	// s += "\n" + helpStyle.Render(
+	// 		"↑/↓ move • space toggle • d delete • q quit • a add",
+	// )
+	// return s
+
 	if m.adding {
-		var s string
-		s += titleStyle.Render("Add new todo") + "\n"
-		s += "──────────────\n"
-		s += inputStyle.Render("> "+m.input+"█") + "\n\n"
-		s += helpStyle.Render("(enter to save • esc to cancel)")
-		return s
+		return appStyle.Render(
+			addPaneStyle.Render(
+				titleStyle.Render("Add Todo") + "\n\n" +
+					inputStyle.Render("> " + m.input + "█") + "\n\n" +
+					helpStyle.Render("enter save • esc cancel"),
+			),
+		)
 	}
-	var s string
-	//title
-	s += titleStyle.Render(m.message) + "\n\n"
-	//render todos
-	for i, t := range m.todos {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
-		checbox := "[ ]"
-		if t.done {
-			checbox = "[x]"
-		}
-		text := t.text
-		if m.cursor == i {
-			text = strings.ToUpper(text)
-		}
-		line := cursor + " " + checbox + " " + text
-		if t.done {
-			line = doneStyle.Render(line)
-		}
-		if m.cursor == i {
-			line = selectedStyle.Render(line)
-		}
-		s += line + "\n"
-	}
-	s += m.selectedItem
-	s += "\n" + helpStyle.Render(
-			"↑/↓ move • space toggle • d delete • q quit • a add",
+
+	left := m.renderListPane()
+	right := m.renderDetailPane()
+
+	layout := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		left,
+		right,
 	)
-	return s
+
+	return appStyle.Render(
+		layout + "\n\n" +
+			helpStyle.Render("↑/↓ move • a add • space toggle • d delete • q quit"),
+	)
 }
 
 func main() {
