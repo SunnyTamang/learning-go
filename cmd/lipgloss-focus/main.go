@@ -20,7 +20,12 @@ type model struct {
 	//scroll  int
 	viewport viewport.Model
 	lines    []string
-	focused  bool
+	// focused  bool
+	focus ui.FocusedSection
+
+	//left pane state
+	leftItems []string
+	leftIndex int
 }
 
 func initialModel() model {
@@ -30,8 +35,17 @@ func initialModel() model {
 	}
 
 	return model{
-		lines:   lines,
-		focused: true,
+		lines: lines,
+		//focused: true,
+		focus: ui.FocusBody,
+
+		leftItems: []string{
+			"Overview",
+			"Commits",
+			"Branches",
+			"Settings",
+		},
+		leftIndex: 0,
 	}
 }
 
@@ -70,26 +84,62 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// case "k", "up":
 		// 	m.viewport.LineUp(1)
 		case "tab":
-			m.focused = !m.focused
+			//m.focused = !m.focused
+			m.focus = (m.focus + 1) % 3
+			return m, nil
 
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		}
+		if m.focus == ui.FocusLeft {
+		switch msg.String() {
+		case "j", "down":
+			if m.leftIndex < len(m.leftItems)-1 {
+				m.leftIndex++
+			}
+		case "k", "up":
+			if m.leftIndex > 0 {
+				m.leftIndex--
+			}
+		case "enter":
+			m.viewport.SetContent(
+				fmt.Sprintf("Selected: %s\n\n%s",
+					m.leftItems[m.leftIndex],
+					strings.Join(m.lines, "\n"),
+				),
+			)
+		}
+		return m, nil
 	}
-	m.viewport, cmd = m.viewport.Update(msg)
+	}
+	// m.viewport, cmd = m.viewport.Update(msg)
+	if m.focus == ui.FocusBody {
+		m.viewport, cmd = m.viewport.Update(msg)
+		return m, cmd
+	}
 
-	return m, cmd
+	return m, nil
 
 }
 
-func scrollStatus(scroll, total int) string {
-	if total == 0 {
-		return "0 / 0"
-	}
-	return fmt.Sprintf("Line %d / %d", scroll+1, total)
-}
+// func scrollStatus(scroll, total int) string {
+// 	if total == 0 {
+// 		return "0 / 0"
+// 	}
+// 	return fmt.Sprintf("Line %d / %d", scroll+1, total)
+// }
 
 func (m model) View() string {
+	var leftBuilder strings.Builder
+
+	for i, item := range m.leftItems {
+		if i == m.leftIndex {
+			leftBuilder.WriteString("▶ " + item + "\n")
+		} else {
+			leftBuilder.WriteString("  " + item + "\n")
+		}
+
+	}
 	if m.width == 0 || m.height == 0 {
 		return "loading..."
 	}
@@ -111,21 +161,21 @@ func (m model) View() string {
 	// }
 
 	// ---- Scroll view ----
-	
+
 	footerText := fmt.Sprintf(
 		"Line %d / %d  •  ↑ ↓ / j k  •  Tab focus  •  q quit",
-		m.viewport.YOffset + 1,
+		m.viewport.YOffset+1,
 		m.viewport.TotalLineCount(),
 	)
-	
 
 	layout := ui.Layout{
 		Width:  m.width,
 		Height: m.height,
 		Header: "SCROLL DEMO",
+		Left: leftBuilder.String(),
 		//Body:    scrollView.View(),
-		Footer:  footerText,
-		Focused: m.focused,
+		Footer:           footerText,
+		Focus:            m.focus,
 		ShowHeaderShadow: m.viewport.YOffset > 0,
 	}
 
